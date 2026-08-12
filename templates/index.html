@@ -296,6 +296,32 @@
             accent-color: var(--primary);
             transform: scale(1.1);
         }
+
+        /* Botón flotante de WhatsApp */
+        .whatsapp-float {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            background-color: #25d366;
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            text-align: center;
+            font-size: 32px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .whatsapp-float:hover {
+            background-color: #20ba5a;
+            transform: scale(1.08);
+        }
     </style>
 </head>
 <body>
@@ -387,6 +413,11 @@
             </div>
         </div>
     </div>
+
+    <!-- Botón Flotante de WhatsApp -->
+    <a href="https://wa.me/5491173708775?text=Hola!%20Tengo%20una%20consulta%20sobre%20el%20cotizador%20de%20corte%20láser." class="whatsapp-float" target="_blank" title="Escríbenos por WhatsApp">
+        💬
+    </a>
 
     <script>
         const fileInput = document.getElementById('fileInput');
