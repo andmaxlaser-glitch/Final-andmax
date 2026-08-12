@@ -326,13 +326,292 @@
     </style>
 </head>
 <body>
-    <!-- (El contenido HTML del cuerpo sigue igual que antes) -->
-    
+    <div class="container">
+        <h1>Cotizador de Corte Láser</h1>
+        <p class="subtitle">Sube tus archivos DXF, configuralos y añádelos al carrito para abonar tu pedido.</p>
+        
+        <form id="uploadForm">
+            <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+                <p>📂 Haz clic aquí o arrastra tu archivo DXF</p>
+                <input type="file" id="fileInput" name="archivo_dxf" accept=".dxf" style="display: none;">
+                <span id="fileName"></span>
+            </div>
+
+            <div class="form-group">
+                <div class="control-item">
+                    <label for="material">Material</label>
+                    <select id="material" name="material">
+                        <option value="MDF">MDF</option>
+                        <option value="Acrilico">Acrílico</option>
+                        <option value="Acero al carbono">Acero al carbono</option>
+                        <option value="Acero inoxidable">Acero inoxidable</option>
+                        <option value="Aluminio">Aluminio</option>
+                    </select>
+                </div>
+                <div class="control-item">
+                    <label for="espesor">Espesor (mm)</label>
+                    <input type="number" id="espesor" name="espesor" min="1" max="12" value="1">
+                </div>
+                <div class="control-item">
+                    <label for="cantidad">Cantidad</label>
+                    <input type="number" id="cantidad" name="cantidad" min="1" value="1">
+                </div>
+            </div>
+
+            <button type="submit">Previsualizar y Calcular Pieza</button>
+        </form>
+
+        <!-- Vista Previa del Archivo Actual -->
+        <div id="resultadoBox" class="resultado-box">
+            <h3>Detalle de la pieza analizada</h3>
+            <p id="infoTexto" style="line-height: 1.6; color: var(--text-muted);"></p>
+            
+            <div class="canvas-container">
+                <h4 style="color: #94a3b8; margin-top: 0; font-weight: 500; font-size: 14px;">VISTA PREVIA DEL DISEÑO</h4>
+                <canvas id="dxfCanvas" width="450" height="300"></canvas>
+            </div>
+
+            <div id="precioUnitarioTexto" style="font-weight: 600; margin: 15px 0; font-size: 16px; color: var(--text-main);"></div>
+            <button type="button" class="btn-success" onclick="agregarAlCarrito()">Agregar esta pieza al Carrito</button>
+        </div>
+
+        <!-- Sección del Carrito de Compras -->
+        <div class="carrito-section">
+            <h2>🛒 Tu Carrito de Cotizaciones</h2>
+            <div id="carritoVacio">El carrito está vacío. Agrega piezas usando el formulario de arriba.</div>
+            
+            <div id="carritoContenido" style="display: none;">
+                <table class="carrito-tabla">
+                    <thead>
+                        <tr>
+                            <th>Archivo</th>
+                            <th>Material / Espesor</th>
+                            <th>Cant.</th>
+                            <th>Subtotal</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="carritoItems"></tbody>
+                </table>
+                <div id="carritoTotal" class="carrito-total">Total: $0.00</div>
+                
+                <!-- Selector de Método de Entrega Mejorado -->
+                <div class="envio-box">
+                    <label style="color: var(--text-main);">Selecciona el método de entrega:</label>
+                    <div class="envio-options">
+                        <label class="envio-option-label">
+                            <input type="radio" id="retiro" name="metodoEntrega" value="Retiro en sucursal (Campana)" checked>
+                            Retiro en sucursal (Campana)
+                        </label>
+                        <label class="envio-option-label">
+                            <input type="radio" id="correo" name="metodoEntrega" value="Envío por correo">
+                            Envío por correo
+                        </label>
+                    </div>
+                </div>
+
+                <button type="button" id="btnCheckout" class="btn-success" style="font-size: 18px; padding: 15px; margin-top: 25px; display: none;" onclick="iniciarCheckout()">Pagar con Mercado Pago</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Botón Flotante de WhatsApp con Logo -->
-    <a href="https://wa.me/5491173708775?text=Hola!%20Tengo%20una%20consulta%20sobre%20el%20cotizador." class="whatsapp-float" target="_blank">
+    <a href="https://wa.me/549XXXXXXXXXX?text=Hola!%20Tengo%20una%20consulta%20sobre%20el%20cotizador." class="whatsapp-float" target="_blank" title="Escríbenos por WhatsApp">
         <i class="fab fa-whatsapp"></i>
     </a>
-    
-    <!-- ... resto del script ... -->
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const fileNameSpan = document.getElementById('fileName');
+        const uploadForm = document.getElementById('uploadForm');
+        const resultadoBox = document.getElementById('resultadoBox');
+        const infoTexto = document.getElementById('infoTexto');
+        const precioUnitarioTexto = document.getElementById('precioUnitarioTexto');
+        const canvas = document.getElementById('dxfCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let ultimaData = null; 
+        let carrito = [];      
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                fileNameSpan.textContent = `Archivo seleccionado: ${fileInput.files[0].name}`;
+            }
+        });
+
+        function dibujarPieza(data) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const geom = data.geometrias;
+            const b = data.bounds;
+
+            if (!b || b.width === 0 || b.height === 0) return;
+
+            const padding = 30;
+            const drawWidth = canvas.width - (padding * 2);
+            const drawHeight = canvas.height - (padding * 2);
+
+            const scaleX = drawWidth / b.width;
+            const scaleY = drawHeight / b.height;
+            const scale = Math.min(scaleX, scaleY);
+
+            ctx.save();
+            ctx.translate(padding, canvas.height - padding);
+            ctx.scale(scale, -scale);
+            ctx.translate(-b.min_x, -b.min_y);
+
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 1.5 / scale;
+
+            geom.lineas.forEach(l => {
+                ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke();
+            });
+            geom.circulos.forEach(c => {
+                ctx.beginPath(); ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI); ctx.stroke();
+            });
+            geom.arcos.forEach(a => {
+                ctx.beginPath(); ctx.arc(a.cx, a.cy, a.r, a.start, a.end); ctx.stroke();
+            });
+            geom.polilineas.forEach(pts => {
+                if (pts.length > 1) {
+                    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+                    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+                    ctx.stroke();
+                }
+            });
+            ctx.restore();
+        }
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (fileInput.files.length === 0) {
+                alert('Selecciona un archivo DXF primero.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('archivo_dxf', fileInput.files[0]);
+            formData.append('material', document.getElementById('material').value);
+            formData.append('espesor', document.getElementById('espesor').value);
+            formData.append('cantidad', document.getElementById('cantidad').value);
+
+            infoTexto.textContent = 'Analizando pieza...';
+            precioUnitarioTexto.textContent = '';
+            resultadoBox.style.display = 'block';
+
+            try {
+                const response = await fetch('/analizar', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (data.estado === 'exito') {
+                    ultimaData = data;
+                    ultimaData.nombre_archivo = fileInput.files[0].name;
+
+                    infoTexto.innerHTML = `
+                        <b>Dimensiones:</b> ${data.dimensiones} | 
+                        <b>Perímetro:</b> ${data.perimetro_total_mm} mm<br>
+                        <b>Material configurado:</b> ${data.material} (${data.espesor} mm) | 
+                        <b>Cantidad:</b> ${data.cantidad} u.
+                    `;
+                    precioUnitarioTexto.innerHTML = `Subtotal de este grupo: $${data.precio_total.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
+                    
+                    dibujarPieza(data);
+                } else {
+                    infoTexto.textContent = `Error: ${data.mensaje}`;
+                    precioUnitarioTexto.textContent = '';
+                }
+            } catch (error) {
+                infoTexto.textContent = 'Ocurrió un error al procesar la solicitud.';
+            }
+        });
+
+        function agregarAlCarrito() {
+            if (!ultimaData) return;
+
+            carrito.push(ultimaData);
+            actualizarTablaCarrito();
+
+            resultadoBox.style.display = 'none';
+            fileInput.value = '';
+            fileNameSpan.textContent = '';
+            ultimaData = null;
+        }
+
+        function eliminarDelCarrito(index) {
+            carrito.splice(index, 1);
+            actualizarTablaCarrito();
+        }
+
+        function actualizarTablaCarrito() {
+            const carritoVacio = document.getElementById('carritoVacio');
+            const carritoContenido = document.getElementById('carritoContenido');
+            const carritoItems = document.getElementById('carritoItems');
+            const carritoTotal = document.getElementById('carritoTotal');
+            const btnCheckout = document.getElementById('btnCheckout');
+
+            if (carrito.length === 0) {
+                carritoVacio.style.display = 'block';
+                carritoContenido.style.display = 'none';
+                return;
+            }
+
+            carritoVacio.style.display = 'none';
+            carritoContenido.style.display = 'block';
+            carritoItems.innerHTML = '';
+
+            let totalGeneral = 0;
+
+            carrito.forEach((item, index) => {
+                totalGeneral += item.precio_total;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><b>${item.nombre_archivo}</b><br><span style="color:var(--text-muted); font-size:12px;">${item.dimensiones}</span></td>
+                    <td>${item.material} - ${item.espesor}mm</td>
+                    <td>${item.cantidad} u.</td>
+                    <td><b>$${item.precio_total.toLocaleString('es-AR', {minimumFractionDigits: 2})}</b></td>
+                    <td><button type="button" class="btn-danger" onclick="eliminarDelCarrito(${index})">Eliminar</button></td>
+                `;
+                carritoItems.appendChild(tr);
+            });
+
+            carritoTotal.textContent = `Total General: $${totalGeneral.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
+            btnCheckout.style.display = 'block';
+        }
+
+        async function iniciarCheckout() {
+            if (carrito.length === 0) return;
+
+            const btnCheckout = document.getElementById('btnCheckout');
+            btnCheckout.disabled = true;
+            btnCheckout.textContent = 'Generando orden de pago...';
+
+            const metodoEntregaSeleccionado = document.querySelector('input[name="metodoEntrega"]:checked').value;
+
+            const datosAEnviar = {
+                items: carrito,
+                metodo_entrega: metodoEntregaSeleccionado
+            };
+
+            try {
+                const response = await fetch('/crear_preferencia', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datosAEnviar)
+                });
+                const data = await response.json();
+
+                if (data.init_point) {
+                    window.location.href = data.init_point;
+                } else {
+                    alert('Error al crear la preferencia de pago: ' + (data.error || 'Desconocido'));
+                    btnCheckout.disabled = false;
+                    btnCheckout.textContent = 'Pagar con Mercado Pago';
+                }
+            } catch (error) {
+                alert('Ocurrió un error de conexión con la pasarela de pagos.');
+                btnCheckout.disabled = false;
+                btnCheckout.textContent = 'Pagar con Mercado Pago';
+            }
+        }
+    </script>
 </body>
 </html>
