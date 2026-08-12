@@ -51,10 +51,9 @@ def crear_preferencia():
         return jsonify({"error": "Carrito vacío o inválido"}), 400
 
     for item in datos_carrito:
-        # Construimos el ítem para Mercado Pago basado en lo que hay en el carrito
         titulo = f"Corte Láser: {item.get('nombre_archivo', 'Pieza')} ({item.get('material')} {item.get('espesor')}mm)"
         cantidad = int(item.get('cantidad', 1))
-        precio_unitario = float(item.get('precio_total', 0)) / cantidad # MP pide precio por unidad
+        precio_unitario = float(item.get('precio_total', 0)) / cantidad
         
         items_mp.append({
             "title": titulo,
@@ -63,23 +62,32 @@ def crear_preferencia():
             "unit_price": round(precio_unitario, 2)
         })
 
+    # Obtenemos la URL actual de tu sitio automáticamente para el retorno de pago
+    base_url = request.host_url.rstrip('/')
+
     preference_data = {
         "items": items_mp,
         "back_urls": {
-            "success": "https://tusitio.onrender.com/",  # Reemplaza con tu URL real de Render
-            "failure": "https://tusitio.onrender.com/",
-            "pending": "https://tusitio.onrender.com/"
+            "success": f"{base_url}/",
+            "failure": f"{base_url}/",
+            "pending": f"{base_url}/"
         },
         "auto_return": "approved",
     }
 
     try:
         preference_response = sdk.preference().create(preference_data)
-        preference = preference_response["response"]
-        return jsonify({"id": preference["id"], "init_point": preference["init_point"]})
+        
+        # Imprimimos la respuesta completa en la consola de Render por si hay dudas
+        print("Respuesta de Mercado Pago:", preference_response)
+        
+        if "response" in preference_response and "id" in preference_response["response"]:
+            preference = preference_response["response"]
+            return jsonify({"id": preference["id"], "init_point": preference["init_point"]})
+        else:
+            # Si Mercado Pago devolvió un error de validación, lo capturamos
+            error_msg = preference_response.get("response", "Respuesta desconocida de MP")
+            return jsonify({"error": str(error_msg)}), 400
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
