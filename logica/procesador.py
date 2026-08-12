@@ -1,7 +1,7 @@
 import ezdxf
 import math
 
-def calcular_precio_pro(perimetro_mm, ancho_mm, alto_mm, material, espesor):
+def calcular_precio_pro(perimetro_mm, ancho_mm, alto_mm, material, espesor, cantidad):
     precios = {
         "MDF": {1: 600, 2: 700, 3: 800, 5: 900, 8: 1000, 10: 1200},
         "Acrilico": {1: 800, 2: 900, 3: 1000, 4: 1100, 5: 1200, 6: 1400, 8: 1600, 10: 1800},
@@ -22,17 +22,20 @@ def calcular_precio_pro(perimetro_mm, ancho_mm, alto_mm, material, espesor):
         area_m2 = (ancho_mm / 1000) * (alto_mm / 1000)
         costo_material = area_m2 * (tarifa_base * 0.4) 
         
-        precio_total = costo_corte + costo_material
+        # Precio por una unidad
+        precio_unitario = costo_corte + costo_material
         precio_minimo = 2000 if "Acero" in material or material == "Aluminio" else 800
         
-        if precio_total < precio_minimo:
-            precio_total = precio_minimo
+        if precio_unitario < precio_minimo:
+            precio_unitario = precio_minimo
             
+        # Precio total multiplicando por la cantidad de piezas
+        precio_total = precio_unitario * cantidad
         return round(precio_total, 2)
     except:
         return 0.0
 
-def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
+def analizar_dxf(ruta_archivo, material="MDF", espesor=1, cantidad=1):
     try:
         doc = ezdxf.readfile(ruta_archivo)
         msp = doc.modelspace()
@@ -94,7 +97,7 @@ def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
         alto_mm = max_y - min_y if max_y > min_y else 100
 
         perimetro_redondeado = round(perimetro_total, 2)
-        precio_calculado = calcular_precio_pro(perimetro_redondeado, ancho_mm, alto_mm, material, espesor)
+        precio_calculado = calcular_precio_pro(perimetro_redondeado, ancho_mm, alto_mm, material, espesor, cantidad)
 
         return {
             "estado": "exito",
@@ -108,6 +111,7 @@ def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
             "dimensiones": f"{round(ancho_mm, 1)} x {round(alto_mm, 1)} mm",
             "material": material,
             "espesor": espesor,
+            "cantidad": cantidad,
             "precio_total": precio_calculado,
             "bounds": {"min_x": min_x, "min_y": min_y, "max_x": max_x, "max_y": max_y, "width": ancho_mm, "height": alto_mm},
             "geometrias": geometrias
