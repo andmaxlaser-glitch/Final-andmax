@@ -23,7 +23,7 @@
 <body>
     <div class="container">
         <h1>Cotizador de Corte Láser</h1>
-        <p style="text-align: center;">Sube tu archivo DXF, visualiza tu pieza y obtén tu presupuesto al instante.</p>
+        <p style="text-align: center;">Sube tu archivo DXF, define la cantidad y el material para obtener tu presupuesto.</p>
         
         <form id="uploadForm">
             <div class="upload-box" onclick="document.getElementById('fileInput').click()">
@@ -46,6 +46,10 @@
                 <div>
                     <label for="espesor"><b>Espesor (mm):</b></label>
                     <input type="number" id="espesor" name="espesor" min="1" max="12" value="1" style="width: 70px;">
+                </div>
+                <div>
+                    <label for="cantidad"><b>Cantidad:</b></label>
+                    <input type="number" id="cantidad" name="cantidad" min="1" value="1" style="width: 70px;">
                 </div>
             </div>
 
@@ -88,26 +92,22 @@
 
             if (!b || b.width === 0 || b.height === 0) return;
 
-            // Margen de padding en el canvas (en píxeles)
             const padding = 40;
             const drawWidth = canvas.width - (padding * 2);
             const drawHeight = canvas.height - (padding * 2);
 
-            // Escala para ajustar la pieza al tamaño del canvas manteniendo proporciones
             const scaleX = drawWidth / b.width;
             const scaleY = drawHeight / b.height;
             const scale = Math.min(scaleX, scaleY);
 
             ctx.save();
-            // Centrar y voltear el eje Y (DXF usa coordenadas cartesianas hacia arriba, el canvas hacia abajo)
             ctx.translate(padding, canvas.height - padding);
             ctx.scale(scale, -scale);
             ctx.translate(-b.min_x, -b.min_y);
 
-            ctx.strokeStyle = '#00ffcc'; // Color láser brillante
-            ctx.lineWidth = 1.5 / scale; // Mantener grosor de línea visible
+            ctx.strokeStyle = '#00ffcc';
+            ctx.lineWidth = 1.5 / scale;
 
-            // Dibujar líneas
             geom.lineas.forEach(l => {
                 ctx.beginPath();
                 ctx.moveTo(l.x1, l.y1);
@@ -115,21 +115,18 @@
                 ctx.stroke();
             });
 
-            // Dibujar círculos
             geom.circulos.forEach(c => {
                 ctx.beginPath();
                 ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI);
                 ctx.stroke();
             });
 
-            // Dibujar arcos
             geom.arcos.forEach(a => {
                 ctx.beginPath();
                 ctx.arc(a.cx, a.cy, a.r, a.start, a.end);
                 ctx.stroke();
             });
 
-            // Dibujar polilineas
             geom.polilineas.forEach(pts => {
                 if (pts.length > 1) {
                     ctx.beginPath();
@@ -155,8 +152,9 @@
             formData.append('archivo_dxf', fileInput.files[0]);
             formData.append('material', document.getElementById('material').value);
             formData.append('espesor', document.getElementById('espesor').value);
+            formData.append('cantidad', document.getElementById('cantidad').value);
 
-            infoTexto.textContent = 'Analizando pieza y generando gráfico...';
+            infoTexto.textContent = 'Analizando pieza y calculando costos...';
             precioTexto.textContent = '';
             resultadoBox.style.display = 'block';
 
@@ -168,11 +166,11 @@
                     infoTexto.innerHTML = `
                         <b>Dimensiones:</b> ${data.dimensiones} | 
                         <b>Perímetro:</b> ${data.perimetro_total_mm} mm<br>
-                        <b>Material:</b> ${data.material} (${data.espesor} mm)
+                        <b>Material:</b> ${data.material} (${data.espesor} mm) | 
+                        <b>Cantidad:</b> ${data.cantidad} u.
                     `;
-                    precioTexto.innerHTML = `Precio Estimado: $${data.precio_total.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
+                    precioTexto.innerHTML = `Precio Total: $${data.precio_total.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
                     
-                    // Ejecutar el visor en el canvas
                     dibujarPieza(data);
                 } else {
                     infoTexto.textContent = `Error: ${data.mensaje}`;
