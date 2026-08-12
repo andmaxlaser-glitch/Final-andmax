@@ -142,7 +142,7 @@ def enviar_correo_nuevo_pedido(app_context, carrito):
                             })
 
             params = {
-                "from": "Cotizador Andmax <onboarding@resend.dev>",
+                "from": "onboarding@resend.dev",
                 "to": [CORREO_DESTINO],
                 "subject": "¡Nuevo pedido de corte láser pagado! 🚀",
                 "html": cuerpo_html,
