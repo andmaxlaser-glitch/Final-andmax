@@ -27,7 +27,6 @@ def analizar():
         ruta_archivo = os.path.join(app.config['UPLOAD_FOLDER'], archivo.filename)
         archivo.save(ruta_archivo)
         
-        # Procesar pasando material y espesor
         resultado = analizar_dxf(ruta_archivo, material, espesor)
         return jsonify(resultado)
 
