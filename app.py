@@ -2,8 +2,8 @@ import os
 import gc
 import threading
 import mercadopago
+import resend
 from flask import Flask, render_template, request, jsonify
-from flask_mail import Mail, Message
 from logica.procesador import analizar_dxf
 
 app = Flask(__name__)
@@ -15,16 +15,10 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 MP_ACCESS_TOKEN = os.environ.get('MP_ACCESS_TOKEN', 'TU_ACCESS_TOKEN_DE_MERCADO_PAGO')
 sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
 
-# Configuración de Correo optimizada con SSL (Puerto 465)
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 465
-app.config['MAIL_USE_TLS'] = False
-app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'tu_correo@gmail.com')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'tu_contrasena_de_aplicacion')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME', 'tu_correo@gmail.com')
+# Configuración de Resend API (Usa puerto 443 HTTP, nunca se bloquea)
+resend.api_key = os.environ.get('RESEND_API_KEY', 're_tu_api_key_aqui')
+CORREO_DESTINO = os.environ.get('MAIL_USERNAME', 'tu_correo@gmail.com')
 
-mail = Mail(app)
 ordenes_pendientes = {}
 
 @app.route('/')
@@ -120,9 +114,6 @@ def crear_preferencia():
 def enviar_correo_nuevo_pedido(app_context, carrito):
     with app_context.app_context():
         try:
-            asunto = "¡Nuevo pedido de corte láser pagado! 🚀"
-            destinatario = app.config['MAIL_USERNAME']
-            
             cuerpo_html = "<h3>Has recibido un nuevo pedido abonado a través de la web:</h3><ul>"
             for item in carrito:
                 cuerpo_html += f"""
@@ -135,26 +126,35 @@ def enviar_correo_nuevo_pedido(app_context, carrito):
                 """
             cuerpo_html += "</ul><p>Los planos originales se encuentran adjuntos en este correo.</p>"
 
-            msg = Message(subject=asunto, recipients=[destinatario], html=cuerpo_html)
-
+            # Preparar archivos adjuntos para Resend
+            adjuntos = []
             for item in carrito:
                 nombre_fisico = item.get('nombre_archivo_fisico')
                 if nombre_fisico:
                     ruta_completa = os.path.join(app.config['UPLOAD_FOLDER'], nombre_fisico)
                     if os.path.exists(ruta_completa):
                         with open(ruta_completa, 'rb') as f:
-                            contenido = f.read()
-                            msg.attach(
-                                filename=item.get('nombre_archivo', 'pieza.dxf'),
-                                content_type='application/octet-stream',
-                                data=contenido
-                            )
+                            contenido_bytes = f.read()
+                            import base64
+                            contenido_base64 = base64.b64encode(contenido_bytes).decode('utf-8')
+                            adjuntos.append({
+                                "filename": item.get('nombre_archivo', 'pieza.dxf'),
+                                "content": contenido_base64
+                            })
 
-            mail.send(msg)
+            params = {
+                "from": "Cotizador Andmax <onboarding@resend.dev>",
+                "to": [CORREO_DESTINO],
+                "subject": "¡Nuevo pedido de corte láser pagado! 🚀",
+                "html": cuerpo_html,
+                "attachments": adjuntos
+            }
+
+            email = resend.Emails.send(params)
+            print(f"¡Correo enviado con éxito mediante Resend! ID: {email}")
             gc.collect()
-            print("¡Correo de pedido enviado con éxito!")
         except Exception as e:
-            print(f"Error detallado al enviar el correo: {e}")
+            print(f"Error detallado al enviar el correo con Resend: {e}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
