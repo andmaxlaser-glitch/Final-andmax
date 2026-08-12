@@ -2,3 +2,4 @@ flask
 ezdxf
 gunicorn
 matplotlib
+mercadopago
