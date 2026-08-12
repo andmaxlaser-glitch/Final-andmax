@@ -38,6 +38,18 @@
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
         }
 
+        /* Estilos para el Logo de Andmax */
+        .logo-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .logo-container img {
+            max-height: 60px;
+            width: auto;
+            object-fit: contain;
+        }
+
         h1 {
             color: var(--text-main);
             text-align: center;
@@ -327,6 +339,11 @@
 </head>
 <body>
     <div class="container">
+        <!-- Logo de Andmax -->
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Andmax Logo">
+        </div>
+
         <h1>Cotizador de Corte Láser</h1>
         <p class="subtitle">Sube tus archivos DXF, configuralos y añádelos al carrito para abonar tu pedido.</p>
         
