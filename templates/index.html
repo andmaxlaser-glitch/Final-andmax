@@ -22,12 +22,14 @@
         .canvas-container { margin-top: 15px; text-align: center; background: #1e1e1e; border-radius: 6px; padding: 15px; }
         canvas { max-width: 100%; height: auto; background: #1e1e1e; display: block; margin: 0 auto; }
         
-        /* Estilos del Carrito */
+        /* Estilos del Carrito y Envío */
         .carrito-section { margin-top: 30px; border-top: 2px solid #dee2e6; padding-top: 20px; }
         .carrito-tabla { width: 100%; border-collapse: collapse; margin-top: 15px; }
         .carrito-tabla th, .carrito-tabla td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
         .carrito-tabla th { background-color: #f8f9fa; }
         .carrito-total { font-size: 20px; font-weight: bold; color: #28a745; text-align: right; margin-top: 15px; }
+        .envio-box { margin-top: 20px; background: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }
+        .envio-box label { font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -99,6 +101,16 @@
                     <tbody id="carritoItems"></tbody>
                 </table>
                 <div id="carritoTotal" class="carrito-total">Total: $0.00</div>
+                
+                <!-- Selector de Método de Entrega -->
+                <div class="envio-box">
+                    <p style="margin-top: 0; font-weight: bold;">Selecciona el método de entrega:</p>
+                    <input type="radio" id="retiro" name="metodoEntrega" value="Retiro en sucursal (Campana)" checked>
+                    <label for="retiro">Retiro en sucursal (Campana)</label><br><br>
+                    <input type="radio" id="correo" name="metodoEntrega" value="Envío por correo">
+                    <label for="correo">Envío por correo</label>
+                </div>
+
                 <button type="button" id="btnCheckout" class="btn-success" style="font-size: 18px; padding: 15px; display: none;" onclick="iniciarCheckout()">Pagar con Mercado Pago</button>
             </div>
         </div>
@@ -268,11 +280,20 @@
             btnCheckout.disabled = true;
             btnCheckout.textContent = 'Generando orden de pago...';
 
+            // Capturar el método de entrega seleccionado
+            const metodoEntregaSeleccionado = document.querySelector('input[name="metodoEntrega"]:checked').value;
+
+            // Adjuntar el método de entrega a cada ítem o enviarlo estructurado
+            const datosAEnviar = {
+                items: carrito,
+                metodo_entrega: metodoEntregaSeleccionado
+            };
+
             try {
                 const response = await fetch('/crear_preferencia', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(carrito)
+                    body: JSON.stringify(datosAEnviar)
                 });
                 const data = await response.json();
 
@@ -289,15 +310,6 @@
                 btnCheckout.textContent = 'Pagar con Mercado Pago';
             }
         }
-
-        // Mostrar alerta si el pago fue aprobado al volver de Mercado Pago
-        window.addEventListener('DOMContentLoaded', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('status') === 'approved') {
-                alert('¡Pago realizado con éxito! Tu pedido ha sido enviado al taller y nos pondremos manos a la obra.');
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-        });
     </script>
 </body>
 </html>
