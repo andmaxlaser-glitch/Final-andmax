@@ -1,7 +1,8 @@
 import ezdxf
 import math
 
-def calcular_precio(perimetro, material, espesor):
+def calcular_precio(perimetro_mm, material, espesor):
+    # Precios por METRO de corte
     precios = {
         "MDF": {1: 600, 2: 700, 3: 800, 5: 900, 8: 1000, 10: 1200},
         "Acrilico": {1: 800, 2: 900, 3: 1000, 4: 1100, 5: 1200, 6: 1400, 8: 1600, 10: 1800},
@@ -12,8 +13,10 @@ def calcular_precio(perimetro, material, espesor):
     
     try:
         esp_int = int(espesor)
-        costo_unitario = precios.get(material, {}).get(esp_int, 0)
-        return round(perimetro * costo_unitario, 2)
+        costo_por_metro = precios.get(material, {}).get(esp_int, 0)
+        # Convertimos milímetros a metros dividiendo por 1000
+        perimetro_metros = perimetro_mm / 1000
+        return round(perimetro_metros * costo_por_metro, 2)
     except:
         return 0.0
 
@@ -24,9 +27,9 @@ def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
         
         perimetro_total = 0.0
         
+        # ... (mantener el resto de la lógica igual que antes)
         circulos = list(msp.query('CIRCLE'))
-        for c in circulos:
-            perimetro_total += 2 * math.pi * c.dxf.radius
+        for c in circulos: perimetro_total += 2 * math.pi * c.dxf.radius
             
         lineas = list(msp.query('LINE'))
         for l in lineas:
@@ -39,8 +42,7 @@ def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
             perimetro_total += 2 * math.pi * a.dxf.radius * (angulo / 360.0)
 
         polilineas = list(msp.query('LWPOLYLINE'))
-        for pl in polilineas:
-            perimetro_total += pl.length
+        for pl in polilineas: perimetro_total += pl.length
 
         perimetro_redondeado = round(perimetro_total, 2)
         precio_calculado = calcular_precio(perimetro_redondeado, material, espesor)
