@@ -3,3 +3,4 @@ ezdxf
 gunicorn
 matplotlib
 mercadopago
+Flask-Mail
