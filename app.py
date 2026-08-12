@@ -15,10 +15,11 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 MP_ACCESS_TOKEN = os.environ.get('MP_ACCESS_TOKEN', 'TU_ACCESS_TOKEN_DE_MERCADO_PAGO')
 sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
 
-# Configuración de Correo (Flask-Mail con Gmail)
+# Configuración de Correo optimizada con SSL (Puerto 465)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'tu_correo@gmail.com')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'tu_contrasena_de_aplicacion')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME', 'tu_correo@gmail.com')
@@ -34,8 +35,6 @@ def index():
     if status == 'approved' and preference_id and preference_id in ordenes_pendientes:
         datos_compra = ordenes_pendientes.pop(preference_id)
         
-        # Enviamos el correo en un hilo separado (Background Thread) 
-        # para que la página cargue al instante sin trabarse ni congelar a Mercado Pago.
         hilo_correo = threading.Thread(target=enviar_correo_nuevo_pedido, args=(app, datos_compra))
         hilo_correo.start()
         
@@ -153,9 +152,9 @@ def enviar_correo_nuevo_pedido(app_context, carrito):
 
             mail.send(msg)
             gc.collect()
-            print("Correo de pedido enviado con éxito en segundo plano.")
+            print("¡Correo de pedido enviado con éxito!")
         except Exception as e:
-            print(f"Error al enviar el correo en segundo plano: {e}")
+            print(f"Error detallado al enviar el correo: {e}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
