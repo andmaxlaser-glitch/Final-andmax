@@ -1,6 +1,7 @@
 import os
+import gc
 import mercadopago
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify
 from flask_mail import Mail, Message
 from logica.procesador import analizar_dxf
 
@@ -17,24 +18,19 @@ sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'tu_correo@gmail.com') # Tu email
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'tu_contrasena_de_aplicacion') # La contraseña de app de Google
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'tu_correo@gmail.com')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'tu_contrasena_de_aplicacion')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME', 'tu_correo@gmail.com')
 
 mail = Mail(app)
-
-# Memoria temporal para guardar los items del carrito asociados a una preferencia de pago
-# (En producción idealmente se usa base de datos, para este volumen un diccionario temporal funciona perfecto)
 ordenes_pendientes = {}
 
 @app.route('/')
 def index():
-    # Verificamos si Mercado Pago nos devuelve el pago como aprobado
     status = request.args.get('status')
     preference_id = request.args.get('preference_id')
     
     if status == 'approved' and preference_id and preference_id in ordenes_pendientes:
-        # ¡Pago aprobado! Enviamos el mail con los archivos
         datos_compra = ordenes_pendientes.pop(preference_id)
         enviar_correo_nuevo_pedido(datos_compra)
         return render_template('index.html', pago_exitoso=True)
@@ -64,8 +60,11 @@ def analizar():
         archivo.save(ruta_archivo)
         
         resultado = analizar_dxf(ruta_archivo, material, espesor, cantidad)
-        # Guardamos la ruta física exacta del archivo para poder adjuntarlo luego
         resultado['nombre_archivo_fisico'] = archivo.filename
+        
+        # Forzamos la recolección de basura para liberar memoria RAM tras procesar el DXF
+        gc.collect()
+        
         return jsonify(resultado)
 
 @app.route('/crear_preferencia', methods=['POST'])
@@ -106,10 +105,7 @@ def crear_preferencia():
         if "response" in preference_response and "id" in preference_response["response"]:
             preference = preference_response["response"]
             pref_id = preference["id"]
-            
-            # Guardamos temporalmente el carrito vinculado a este ID de preferencia
             ordenes_pendientes[pref_id] = datos_carrito
-            
             return jsonify({"id": pref_id, "init_point": preference["init_point"]})
         else:
             error_msg = preference_response.get("response", "Respuesta desconocida de MP")
@@ -121,7 +117,7 @@ def crear_preferencia():
 def enviar_correo_nuevo_pedido(carrito):
     try:
         asunto = "¡Nuevo pedido de corte láser pagado! 🚀"
-        destinatario = app.config['MAIL_USERNAME'] # Te llega a tu propio mail
+        destinatario = app.config['MAIL_USERNAME']
         
         cuerpo_html = "<h3>Has recibido un nuevo pedido abonado a través de la web:</h3><ul>"
         for item in carrito:
@@ -137,20 +133,25 @@ def enviar_correo_nuevo_pedido(carrito):
 
         msg = Message(subject=asunto, recipients=[destinatario], html=cuerpo_html)
 
-        # Adjuntar cada archivo DXF correspondiente al carrito
+        # Adjuntar archivos leyendo en bloques pequeños para no saturar la RAM
         for item in carrito:
             nombre_fisico = item.get('nombre_archivo_fisico')
             if nombre_fisico:
                 ruta_completa = os.path.join(app.config['UPLOAD_FOLDER'], nombre_fisico)
                 if os.path.exists(ruta_completa):
                     with open(ruta_completa, 'rb') as f:
+                        contenido = f.read()
                         msg.attach(
                             filename=item.get('nombre_archivo', 'pieza.dxf'),
                             content_type='application/octet-stream',
-                            data=f.read()
+                            data=contenido
                         )
 
         mail.send(msg)
+        
+        # Limpieza de memoria RAM después de enviar el correo
+        gc.collect()
+        
     except Exception as e:
         print(f"Error al enviar el correo: {e}")
 
