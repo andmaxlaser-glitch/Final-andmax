@@ -10,48 +10,60 @@
         h1 { color: #111; text-align: center; }
         .upload-box { border: 2px dashed #007bff; padding: 30px; text-align: center; border-radius: 6px; background: #fafbfc; margin-bottom: 20px; cursor: pointer; }
         .upload-box:hover { background: #f0f4f8; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; width: 100%; }
+        .form-group { margin: 15px 0; display: flex; gap: 15px; justify-content: center; align-items: center; flex-wrap: wrap; }
+        select, input[type="number"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; }
+        button { background: #007bff; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 15px; }
         button:hover { background: #0056b3; }
-        .resultado-box { margin-top: 20px; background: #e9ecef; padding: 15px; border-radius: 5px; display: none; }
+        .resultado-box { margin-top: 20px; background: #e9ecef; padding: 20px; border-radius: 5px; display: none; font-size: 16px; }
+        .precio { font-size: 22px; color: #28a745; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Cotizador de Corte Láser</h1>
-        <p style="text-align: center;">Sube tu archivo DXF para analizar dimensiones.</p>
-
+        <p style="text-align: center;">Sube tu archivo DXF y selecciona el material para calcular tu presupuesto.</p>
+        
         <form id="uploadForm">
             <div class="upload-box" onclick="document.getElementById('fileInput').click()">
                 <p>Haz clic aquí o arrastra tu archivo DXF</p>
                 <input type="file" id="fileInput" name="archivo_dxf" accept=".dxf" style="display: none;">
                 <span id="fileName" style="font-weight: bold; color: #007bff;"></span>
             </div>
-            <button type="submit">Analizar Pieza</button>
+
+            <div class="form-group">
+                <div>
+                    <label for="material"><b>Material:</b></label>
+                    <select id="material" name="material">
+                        <option value="MDF">MDF</option>
+                        <option value="Acrilico">Acrílico</option>
+                        <option value="Acero al carbono">Acero al carbono</option>
+                        <option value="Acero inoxidable">Acero inoxidable</option>
+                        <option value="Aluminio">Aluminio</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="espesor"><b>Espesor (mm):</b></label>
+                    <input type="number" id="espesor" name="espesor" min="1" max="12" value="1" style="width: 70px;">
+                </div>
+            </div>
+
+            <button type="submit">Calcular Cotización</button>
         </form>
 
         <div id="resultadoBox" class="resultado-box">
-            <h3>Información del Archivo:</h3>
+            <h3>Resultado del Análisis:</h3>
             <p id="infoTexto"></p>
+            <div id="precioTexto" class="precio"></div>
         </div>
     </div>
-<div style="margin: 15px 0;">
-    <label>Material:</label>
-    <select id="material" name="material" required>
-        <option value="MDF">MDF</option>
-        <option value="Acrilico">Acrílico</option>
-        <option value="Acero al carbono">Acero al carbono</option>
-        <option value="Acero inoxidable">Acero inoxidable</option>
-        <option value="Aluminio">Aluminio</option>
-    </select>
-    <label style="margin-left: 10px;">Espesor (mm):</label>
-    <input type="number" id="espesor" name="espesor" min="1" max="12" value="1" style="width: 50px;">
-</div>
+
     <script>
         const fileInput = document.getElementById('fileInput');
         const fileNameSpan = document.getElementById('fileName');
         const uploadForm = document.getElementById('uploadForm');
         const resultadoBox = document.getElementById('resultadoBox');
         const infoTexto = document.getElementById('infoTexto');
+        const precioTexto = document.getElementById('precioTexto');
 
         fileInput.addEventListener('change', () => {
             if (fileInput.files.length > 0) {
@@ -68,7 +80,11 @@
 
             const formData = new FormData();
             formData.append('archivo_dxf', fileInput.files[0]);
-            infoTexto.textContent = 'Analizando archivo...';
+            formData.append('material', document.getElementById('material').value);
+            formData.append('espesor', document.getElementById('espesor').value);
+
+            infoTexto.textContent = 'Analizando pieza y calculando costos...';
+            precioTexto.textContent = '';
             resultadoBox.style.display = 'block';
 
             try {
@@ -77,13 +93,16 @@
 
                 if (data.estado === 'exito') {
                     infoTexto.innerHTML = `
-                        <b>Líneas:</b> ${data.conteo_elementos.lineas}<br>
-                        <b>Círculos:</b> ${data.conteo_elementos.circulos}<br>
+                        <b>Líneas:</b> ${data.conteo_elementos.lineas} | 
+                        <b>Círculos:</b> ${data.conteo_elementos.circulos} | 
                         <b>Arcos:</b> ${data.conteo_elementos.arcos}<br>
-                        <b>Perímetro Total de Corte:</b> ${data.perimetro_total_mm} mm
+                        <b>Perímetro Total de Corte:</b> ${data.perimetro_total_mm} mm<br>
+                        <b>Material:</b> ${data.material} (${data.espesor} mm)
                     `;
+                    precioTexto.innerHTML = `Precio Estimado: $${data.precio_total.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
                 } else {
                     infoTexto.textContent = `Error: ${data.mensaje}`;
+                    precioTexto.textContent = '';
                 }
             } catch (error) {
                 infoTexto.textContent = 'Ocurrió un error al procesar la solicitud.';
