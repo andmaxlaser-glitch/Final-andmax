@@ -33,7 +33,7 @@
 <body>
     <div class="container">
         <h1>Cotizador de Corte Láser</h1>
-        <p style="text-align: center;">Sube tus archivos DXF, configuralos y añádelos al carrito para armar tu pedido.</p>
+        <p style="text-align: center;">Sube tus archivos DXF, configuralos y añádelos al carrito para abonar tu pedido.</p>
         
         <form id="uploadForm">
             <div class="upload-box" onclick="document.getElementById('fileInput').click()">
@@ -99,8 +99,7 @@
                     <tbody id="carritoItems"></tbody>
                 </table>
                 <div id="carritoTotal" class="carrito-total">Total: $0.00</div>
-                <!-- Aquí prepararemos el botón de pago más adelante -->
-                <button type="button" id="btnCheckout" class="btn-success" style="font-size: 18px; padding: 15px; display: none;" onclick="iniciarCheckout()">Continuar al Pago</button>
+                <button type="button" id="btnCheckout" class="btn-success" style="font-size: 18px; padding: 15px; display: none;" onclick="iniciarCheckout()">Pagar con Mercado Pago</button>
             </div>
         </div>
     </div>
@@ -259,12 +258,37 @@
             });
 
             carritoTotal.textContent = `Total General: $${totalGeneral.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
-            // Mostramos el botón de checkout cuando hay elementos
             btnCheckout.style.display = 'block';
         }
 
-        function iniciarCheckout() {
-            alert('¡Próximo paso! Aquí conectaremos Mercado Pago para procesar el pago del carrito.');
+        async function iniciarCheckout() {
+            if (carrito.length === 0) return;
+
+            const btnCheckout = document.getElementById('btnCheckout');
+            btnCheckout.disabled = true;
+            btnCheckout.textContent = 'Generando orden de pago...';
+
+            try {
+                const response = await fetch('/crear_preferencia', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(carrito)
+                });
+                const data = await response.json();
+
+                if (data.init_point) {
+                    // Redirige al usuario a Mercado Pago
+                    window.location.href = data.init_point;
+                } else {
+                    alert('Error al crear la preferencia de pago: ' + (data.error || 'Desconocido'));
+                    btnCheckout.disabled = false;
+                    btnCheckout.textContent = 'Pagar con Mercado Pago';
+                }
+            } catch (error) {
+                alert('Ocurrió un error de conexión con la pasarela de pagos.');
+                btnCheckout.disabled = false;
+                btnCheckout.textContent = 'Pagar con Mercado Pago';
+            }
         }
     </script>
 </body>
