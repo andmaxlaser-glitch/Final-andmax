@@ -48,16 +48,26 @@ def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
             if x > max_x: max_x = x
             if y > max_y: max_y = y
 
+        geometrias = {
+            "lineas": [],
+            "circulos": [],
+            "arcos": [],
+            "polilineas": []
+        }
+
         circulos = list(msp.query('CIRCLE'))
         for c in circulos:
             perimetro_total += 2 * math.pi * c.dxf.radius
-            actualizar_limites(c.dxf.center.x - c.dxf.radius, c.dxf.center.y - c.dxf.radius)
-            actualizar_limites(c.dxf.center.x + c.dxf.radius, c.dxf.center.y + c.dxf.radius)
+            cx, cy, r = c.dxf.center.x, c.dxf.center.y, c.dxf.radius
+            geometrias["circulos"].append({"cx": cx, "cy": cy, "r": r})
+            actualizar_limites(cx - r, cy - r)
+            actualizar_limites(cx + r, cy + r)
             
         lineas = list(msp.query('LINE'))
         for l in lineas:
             p1, p2 = l.dxf.start, l.dxf.end
             perimetro_total += math.sqrt((p2.x - p1.x)**2 + (p2.y - p1.y)**2)
+            geometrias["lineas"].append({"x1": p1.x, "y1": p1.y, "x2": p2.x, "y2": p2.y})
             actualizar_limites(p1.x, p1.y)
             actualizar_limites(p2.x, p2.y)
             
@@ -65,13 +75,19 @@ def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
         for a in arcos:
             angulo = abs(a.dxf.end_angle - a.dxf.start_angle)
             perimetro_total += 2 * math.pi * a.dxf.radius * (angulo / 360.0)
+            geometrias["arcos"].append({
+                "cx": a.dxf.center.x, "cy": a.dxf.center.y, "r": a.dxf.radius,
+                "start": math.radians(a.dxf.start_angle), "end": math.radians(a.dxf.end_angle)
+            })
             actualizar_limites(a.dxf.center.x - a.dxf.radius, a.dxf.center.y - a.dxf.radius)
             actualizar_limites(a.dxf.center.x + a.dxf.radius, a.dxf.center.y + a.dxf.radius)
 
         polilineas = list(msp.query('LWPOLYLINE'))
         for pl in polilineas:
             perimetro_total += pl.length
-            for p in pl.get_points():
+            pts = [(p[0], p[1]) for p in pl.get_points()]
+            geometrias["polilineas"].append(pts)
+            for p in pts:
                 actualizar_limites(p[0], p[1])
 
         ancho_mm = max_x - min_x if max_x > min_x else 100
@@ -93,7 +109,8 @@ def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
             "material": material,
             "espesor": espesor,
             "precio_total": precio_calculado,
-            "svg_data": ""
+            "bounds": {"min_x": min_x, "min_y": min_y, "max_x": max_x, "max_y": max_y, "width": ancho_mm, "height": alto_mm},
+            "geometrias": geometrias
         }
     except Exception as e:
         return {"estado": "error", "mensaje": f"No pude leer el archivo: {str(e)}"}
