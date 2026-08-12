@@ -1,6 +1,7 @@
 import os
 import mercadopago
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask_mail import Mail, Message
 from logica.procesador import analizar_dxf
 
 app = Flask(__name__)
@@ -8,14 +9,37 @@ UPLOAD_FOLDER = 'pruebas'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Configura tu Access Token de Mercado Pago (Reemplaza con tu token de Producción o Test)
-# Puedes usar una variable de entorno o ponerlo directamente como texto de prueba por ahora:
+# Configuración de Mercado Pago
 MP_ACCESS_TOKEN = os.environ.get('MP_ACCESS_TOKEN', 'TU_ACCESS_TOKEN_DE_MERCADO_PAGO')
 sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
 
+# Configuración de Correo (Flask-Mail con Gmail)
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'tu_correo@gmail.com') # Tu email
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'tu_contrasena_de_aplicacion') # La contraseña de app de Google
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME', 'tu_correo@gmail.com')
+
+mail = Mail(app)
+
+# Memoria temporal para guardar los items del carrito asociados a una preferencia de pago
+# (En producción idealmente se usa base de datos, para este volumen un diccionario temporal funciona perfecto)
+ordenes_pendientes = {}
+
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # Verificamos si Mercado Pago nos devuelve el pago como aprobado
+    status = request.args.get('status')
+    preference_id = request.args.get('preference_id')
+    
+    if status == 'approved' and preference_id and preference_id in ordenes_pendientes:
+        # ¡Pago aprobado! Enviamos el mail con los archivos
+        datos_compra = ordenes_pendientes.pop(preference_id)
+        enviar_correo_nuevo_pedido(datos_compra)
+        return render_template('index.html', pago_exitoso=True)
+        
+    return render_template('index.html', pago_exitoso=False)
 
 @app.route('/analizar', methods=['POST'])
 def analizar():
@@ -40,6 +64,8 @@ def analizar():
         archivo.save(ruta_archivo)
         
         resultado = analizar_dxf(ruta_archivo, material, espesor, cantidad)
+        # Guardamos la ruta física exacta del archivo para poder adjuntarlo luego
+        resultado['nombre_archivo_fisico'] = archivo.filename
         return jsonify(resultado)
 
 @app.route('/crear_preferencia', methods=['POST'])
@@ -62,7 +88,6 @@ def crear_preferencia():
             "unit_price": round(precio_unitario, 2)
         })
 
-    # Obtenemos la URL actual de tu sitio automáticamente para el retorno de pago
     base_url = request.host_url.rstrip('/')
 
     preference_data = {
@@ -78,16 +103,57 @@ def crear_preferencia():
     try:
         preference_response = sdk.preference().create(preference_data)
         
-        # Imprimimos la respuesta completa en la consola de Render por si hay dudas
-        print("Respuesta de Mercado Pago:", preference_response)
-        
         if "response" in preference_response and "id" in preference_response["response"]:
             preference = preference_response["response"]
-            return jsonify({"id": preference["id"], "init_point": preference["init_point"]})
+            pref_id = preference["id"]
+            
+            # Guardamos temporalmente el carrito vinculado a este ID de preferencia
+            ordenes_pendientes[pref_id] = datos_carrito
+            
+            return jsonify({"id": pref_id, "init_point": preference["init_point"]})
         else:
-            # Si Mercado Pago devolvió un error de validación, lo capturamos
             error_msg = preference_response.get("response", "Respuesta desconocida de MP")
             return jsonify({"error": str(error_msg)}), 400
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+def enviar_correo_nuevo_pedido(carrito):
+    try:
+        asunto = "¡Nuevo pedido de corte láser pagado! 🚀"
+        destinatario = app.config['MAIL_USERNAME'] # Te llega a tu propio mail
+        
+        cuerpo_html = "<h3>Has recibido un nuevo pedido abonado a través de la web:</h3><ul>"
+        for item in carrito:
+            cuerpo_html += f"""
+                <li>
+                    <b>Archivo:</b> {item.get('nombre_archivo')}<br>
+                    <b>Material:</b> {item.get('material')} - <b>Espesor:</b> {item.get('espesor')} mm<br>
+                    <b>Cantidad:</b> {item.get('cantidad')} u.<br>
+                    <b>Dimensiones:</b> {item.get('dimensiones')} | <b>Subtotal:</b> ${item.get('precio_total'):,.2f}
+                </li><br>
+            """
+        cuerpo_html += "</ul><p>Los planos originales se encuentran adjuntos en este correo.</p>"
+
+        msg = Message(subject=asunto, recipients=[destinatario], html=cuerpo_html)
+
+        # Adjuntar cada archivo DXF correspondiente al carrito
+        for item in carrito:
+            nombre_fisico = item.get('nombre_archivo_fisico')
+            if nombre_fisico:
+                ruta_completa = os.path.join(app.config['UPLOAD_FOLDER'], nombre_fisico)
+                if os.path.exists(ruta_completa):
+                    with open(ruta_completa, 'rb') as f:
+                        msg.attach(
+                            filename=item.get('nombre_archivo', 'pieza.dxf'),
+                            content_type='application/octet-stream',
+                            data=f.read()
+                        )
+
+        mail.send(msg)
+    except Exception as e:
+        print(f"Error al enviar el correo: {e}")
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
