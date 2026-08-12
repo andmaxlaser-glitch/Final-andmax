@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotizador Láser - Andmax</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { color: #111; text-align: center; }
+        .upload-box { border: 2px dashed #007bff; padding: 30px; text-align: center; border-radius: 6px; background: #fafbfc; margin-bottom: 20px; cursor: pointer; }
+        .upload-box:hover { background: #f0f4f8; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; width: 100%; }
+        button:hover { background: #0056b3; }
+        .resultado-box { margin-top: 20px; background: #e9ecef; padding: 15px; border-radius: 5px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cotizador de Corte Láser</h1>
+        <p style="text-align: center;">Sube tu archivo DXF para analizar dimensiones.</p>
+
+        <form id="uploadForm">
+            <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+                <p>Haz clic aquí o arrastra tu archivo DXF</p>
+                <input type="file" id="fileInput" name="archivo_dxf" accept=".dxf" style="display: none;">
+                <span id="fileName" style="font-weight: bold; color: #007bff;"></span>
+            </div>
+            <button type="submit">Analizar Pieza</button>
+        </form>
+
+        <div id="resultadoBox" class="resultado-box">
+            <h3>Información del Archivo:</h3>
+            <p id="infoTexto"></p>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const fileNameSpan = document.getElementById('fileName');
+        const uploadForm = document.getElementById('uploadForm');
+        const resultadoBox = document.getElementById('resultadoBox');
+        const infoTexto = document.getElementById('infoTexto');
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                fileNameSpan.textContent = `Archivo seleccionado: ${fileInput.files[0].name}`;
+            }
+        });
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (fileInput.files.length === 0) {
+                alert('Selecciona un archivo DXF primero.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('archivo_dxf', fileInput.files[0]);
+            infoTexto.textContent = 'Analizando archivo...';
+            resultadoBox.style.display = 'block';
+
+            try {
+                const response = await fetch('/analizar', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (data.estado === 'exito') {
+                    infoTexto.innerHTML = `
+                        <b>Líneas:</b> ${data.conteo_elementos.lineas}<br>
+                        <b>Círculos:</b> ${data.conteo_elementos.circulos}<br>
+                        <b>Arcos:</b> ${data.conteo_elementos.arcos}<br>
+                        <b>Perímetro Total de Corte:</b> ${data.perimetro_total_mm} mm
+                    `;
+                } else {
+                    infoTexto.textContent = `Error: ${data.mensaje}`;
+                }
+            } catch (error) {
+                infoTexto.textContent = 'Ocurrió un error al procesar la solicitud.';
+            }
+        });
+    </script>
+</body>
+</html>
