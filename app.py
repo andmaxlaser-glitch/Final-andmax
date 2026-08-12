@@ -67,9 +67,19 @@ def analizar():
 
 @app.route('/crear_preferencia', methods=['POST'])
 def crear_preferencia():
-    datos_carrito = request.json
-    items_mp = []
+    datos_recibidos = request.json
     
+    # Manejar tanto si viene con el formato nuevo (diccionario) como si viniera directo como lista antigua
+    if isinstance(datos_recibidos, dict) and "items" in datos_recibidos:
+        datos_carrito = datos_recibidos["items"]
+        metodo_entrega = datos_recibidos.get("metodo_entrega", "Retiro en sucursal")
+    elif isinstance(datos_recibidos, list):
+        datos_carrito = datos_recibidos
+        metodo_entrega = "Retiro en sucursal (Por defecto)"
+    else:
+        return jsonify({"error": "Carrito vacío o inválido"}), 400
+
+    items_mp = []
     if not datos_carrito or not isinstance(datos_carrito, list):
         return jsonify({"error": "Carrito vacío o inválido"}), 400
 
@@ -103,7 +113,13 @@ def crear_preferencia():
         if "response" in preference_response and "id" in preference_response["response"]:
             preference = preference_response["response"]
             pref_id = preference["id"]
-            ordenes_pendientes[pref_id] = datos_carrito
+            
+            # Guardamos el carrito y el método de entrega juntos
+            ordenes_pendientes[pref_id] = {
+                "carrito": datos_carrito,
+                "metodo_entrega": metodo_entrega
+            }
+            
             return jsonify({"id": pref_id, "init_point": preference["init_point"]})
         else:
             error_msg = preference_response.get("response", "Respuesta desconocida de MP")
@@ -112,10 +128,20 @@ def crear_preferencia():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def enviar_correo_nuevo_pedido(app_context, carrito):
+def enviar_correo_nuevo_pedido(app_context, datos_orden):
     with app_context.app_context():
         try:
-            cuerpo_html = "<h3>Has recibido un nuevo pedido abonado a través de la web:</h3><ul>"
+            # Compatibilidad si en algún momento se pasó una lista directa
+            if isinstance(datos_orden, list):
+                carrito = datos_orden
+                metodo_entrega = "No especificado"
+            else:
+                carrito = datos_orden.get("carrito", [])
+                metodo_entrega = datos_orden.get("metodo_entrega", "No especificado")
+
+            cuerpo_html = f"<h3>Has recibido un nuevo pedido abonado a través de la web:</h3>"
+            cuerpo_html += f"<p><b>🚚 Método de entrega seleccionado:</b> {metodo_entrega}</p><ul>"
+            
             for item in carrito:
                 cuerpo_html += f"""
                     <li>
