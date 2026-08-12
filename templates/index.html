@@ -34,7 +34,18 @@
             <p id="infoTexto"></p>
         </div>
     </div>
-
+<div style="margin: 15px 0;">
+    <label>Material:</label>
+    <select id="material" name="material" required>
+        <option value="MDF">MDF</option>
+        <option value="Acrilico">Acrílico</option>
+        <option value="Acero al carbono">Acero al carbono</option>
+        <option value="Acero inoxidable">Acero inoxidable</option>
+        <option value="Aluminio">Aluminio</option>
+    </select>
+    <label style="margin-left: 10px;">Espesor (mm):</label>
+    <input type="number" id="espesor" name="espesor" min="1" max="12" value="1" style="width: 50px;">
+</div>
     <script>
         const fileInput = document.getElementById('fileInput');
         const fileNameSpan = document.getElementById('fileName');
