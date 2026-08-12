@@ -23,11 +23,18 @@ def analizar():
     material = request.form.get('material', 'MDF')
     espesor = request.form.get('espesor', '1')
     
+    # Recibir cantidad (por defecto 1 si no viene)
+    try:
+        cantidad = int(request.form.get('cantidad', 1))
+        if cantidad < 1: cantidad = 1
+    except:
+        cantidad = 1
+    
     if archivo:
         ruta_archivo = os.path.join(app.config['UPLOAD_FOLDER'], archivo.filename)
         archivo.save(ruta_archivo)
         
-        resultado = analizar_dxf(ruta_archivo, material, espesor)
+        resultado = analizar_dxf(ruta_archivo, material, espesor, cantidad)
         return jsonify(resultado)
 
 if __name__ == '__main__':
