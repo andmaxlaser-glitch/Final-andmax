@@ -4,3 +4,4 @@ gunicorn
 matplotlib
 mercadopago
 Flask-Mail
+resend
