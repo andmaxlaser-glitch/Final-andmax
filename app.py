@@ -14,9 +14,11 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 MP_ACCESS_TOKEN = os.environ.get('MP_ACCESS_TOKEN', 'TU_ACCESS_TOKEN_DE_MERCADO_PAGO')
 sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
 
-# Configuración de Resend API (Usa puerto 443 HTTP, nunca se bloquea)
+# Configuración de Resend API
 resend.api_key = os.environ.get('RESEND_API_KEY', 're_tu_api_key_aqui')
-CORREO_DESTINO = os.environ.get('MAIL_USERNAME', 'tu_correo@gmail.com')
+
+# Definimos directamente tu correo de destino para evitar errores de variables faltantes
+CORREO_DESTINO = os.environ.get('CORREO_DESTINO', 'andmaxlaser@gmail.com')
 
 ordenes_pendientes = {}
 
@@ -28,7 +30,7 @@ def index():
     if status == 'approved' and preference_id and preference_id in ordenes_pendientes:
         datos_compra = ordenes_pendientes.pop(preference_id)
         
-        # Envío directo del correo (espera a que termine antes de mostrar la página)
+        # Envío directo del correo al volver del pago aprobado
         enviar_correo_nuevo_pedido(app, datos_compra)
         
         return render_template('index.html', pago_exitoso=True)
