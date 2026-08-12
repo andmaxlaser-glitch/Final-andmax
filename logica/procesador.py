@@ -1,6 +1,7 @@
 import ezdxf
 import math
 import io
+import traceback
 from ezdxf.addons.drawing import RenderContext, Frontend
 from ezdxf.addons.drawing.svg import SVGBackend
 
@@ -47,6 +48,8 @@ def generar_svg(ruta_archivo):
         
         return out.getvalue()
     except Exception as e:
+        # Imprime el error exacto en los logs de Render para depurar
+        print(f"Error generando SVG: {traceback.format_exc()}")
         return ""
 
 def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
@@ -113,7 +116,5 @@ def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
             "precio_total": precio_calculado,
             "svg_data": svg_code
         }
-    except Exception as e:
-        return {"estado": "error", "mensaje": f"No pude leer el archivo: {str(e)}"}
     except Exception as e:
         return {"estado": "error", "mensaje": f"No pude leer el archivo: {str(e)}"}
