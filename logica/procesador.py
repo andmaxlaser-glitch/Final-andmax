@@ -1,9 +1,5 @@
 import ezdxf
 import math
-import io
-import traceback
-from ezdxf.addons.drawing import RenderContext, Frontend
-from ezdxf.addons.drawing.svg import SVGBackend
 
 def calcular_precio_pro(perimetro_mm, ancho_mm, alto_mm, material, espesor):
     precios = {
@@ -35,22 +31,6 @@ def calcular_precio_pro(perimetro_mm, ancho_mm, alto_mm, material, espesor):
         return round(precio_total, 2)
     except:
         return 0.0
-
-def generar_svg(ruta_archivo):
-    try:
-        doc = ezdxf.readfile(ruta_archivo)
-        msp = doc.modelspace()
-        
-        out = io.StringIO()
-        backend = SVGBackend(out)
-        ctx = RenderContext(doc)
-        Frontend(ctx, backend).draw_layout(msp, finalize=True)
-        
-        return out.getvalue()
-    except Exception as e:
-        # Imprime el error exacto en los logs de Render para depurar
-        print(f"Error generando SVG: {traceback.format_exc()}")
-        return ""
 
 def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
     try:
@@ -99,7 +79,6 @@ def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
 
         perimetro_redondeado = round(perimetro_total, 2)
         precio_calculado = calcular_precio_pro(perimetro_redondeado, ancho_mm, alto_mm, material, espesor)
-        svg_code = generar_svg(ruta_archivo)
 
         return {
             "estado": "exito",
@@ -114,7 +93,7 @@ def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
             "material": material,
             "espesor": espesor,
             "precio_total": precio_calculado,
-            "svg_data": svg_code
+            "svg_data": ""
         }
     except Exception as e:
         return {"estado": "error", "mensaje": f"No pude leer el archivo: {str(e)}"}
