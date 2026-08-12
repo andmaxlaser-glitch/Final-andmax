@@ -29,3 +29,16 @@ def analizar():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+@app.route('/analizar', methods=['POST'])
+def analizar():
+    # ... (código anterior de archivo)
+    material = request.form.get('material')
+    espesor = request.form.get('espesor')
+    
+    # ... (guardar archivo)
+    resultado = analizar_dxf(ruta_archivo)
+    
+    # Calcular precio
+    precio_total = calcular_precio(resultado['perimetro_total_mm'], material, espesor)
+    resultado['precio_total'] = precio_total
+    return jsonify(resultado)
