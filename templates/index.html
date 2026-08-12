@@ -6,24 +6,34 @@
     <title>Cotizador Láser - Andmax</title>
     <style>
         body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         h1 { color: #111; text-align: center; }
-        .upload-box { border: 2px dashed #007bff; padding: 30px; text-align: center; border-radius: 6px; background: #fafbfc; margin-bottom: 20px; cursor: pointer; }
+        .upload-box { border: 2px dashed #007bff; padding: 25px; text-align: center; border-radius: 6px; background: #fafbfc; margin-bottom: 20px; cursor: pointer; }
         .upload-box:hover { background: #f0f4f8; }
         .form-group { margin: 15px 0; display: flex; gap: 15px; justify-content: center; align-items: center; flex-wrap: wrap; }
         select, input[type="number"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; }
         button { background: #007bff; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 15px; }
         button:hover { background: #0056b3; }
-        .resultado-box { margin-top: 20px; background: #e9ecef; padding: 20px; border-radius: 5px; display: none; font-size: 16px; }
-        .precio { font-size: 24px; color: #28a745; font-weight: bold; margin-top: 15px; }
-        .canvas-container { margin-top: 20px; text-align: center; background: #1e1e1e; border-radius: 6px; padding: 15px; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        .btn-danger { background: #dc3545; padding: 5px 10px; font-size: 12px; width: auto; margin: 0; }
+        .btn-danger:hover { background: #c82333; }
+        .resultado-box { margin-top: 20px; background: #e9ecef; padding: 20px; border-radius: 5px; display: none; font-size: 15px; }
+        .canvas-container { margin-top: 15px; text-align: center; background: #1e1e1e; border-radius: 6px; padding: 15px; }
         canvas { max-width: 100%; height: auto; background: #1e1e1e; display: block; margin: 0 auto; }
+        
+        /* Estilos del Carrito */
+        .carrito-section { margin-top: 30px; border-top: 2px solid #dee2e6; padding-top: 20px; }
+        .carrito-tabla { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .carrito-tabla th, .carrito-tabla td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
+        .carrito-tabla th { background-color: #f8f9fa; }
+        .carrito-total { font-size: 20px; font-weight: bold; color: #28a745; text-align: right; margin-top: 15px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Cotizador de Corte Láser</h1>
-        <p style="text-align: center;">Sube tu archivo DXF, define la cantidad y el material para obtener tu presupuesto.</p>
+        <p style="text-align: center;">Sube tus archivos DXF, configuralos y añádelos al carrito para armar tu pedido.</p>
         
         <form id="uploadForm">
             <div class="upload-box" onclick="document.getElementById('fileInput').click()">
@@ -53,19 +63,45 @@
                 </div>
             </div>
 
-            <button type="submit">Calcular Cotización</button>
+            <button type="submit">Previsualizar y Calcular Pieza</button>
         </form>
 
+        <!-- Vista Previa del Archivo Actual -->
         <div id="resultadoBox" class="resultado-box">
-            <h3>Resultado del Análisis:</h3>
+            <h3>Detalle de la pieza analizada:</h3>
             <p id="infoTexto"></p>
             
             <div class="canvas-container">
-                <h4 style="color: white; margin-top: 0;">Vista Previa de la Pieza</h4>
-                <canvas id="dxfCanvas" width="500" height="350"></canvas>
+                <h4 style="color: white; margin-top: 0;">Vista Previa</h4>
+                <canvas id="dxfCanvas" width="450" height="300"></canvas>
             </div>
 
-            <div id="precioTexto" class="precio"></div>
+            <div id="precioUnitarioTexto" style="font-weight: bold; margin-top: 10px;"></div>
+            <button type="button" class="btn-success" onclick="agregarAlCarrito()">Agregar esta pieza al Carrito</button>
+        </div>
+
+        <!-- Sección del Carrito de Compras -->
+        <div class="carrito-section">
+            <h2>🛒 Tu Carrito de Cotizaciones</h2>
+            <div id="carritoVacio">El carrito está vacío. Agrega piezas usando el formulario de arriba.</div>
+            
+            <div id="carritoContenido" style="display: none;">
+                <table class="carrito-tabla">
+                    <thead>
+                        <tr>
+                            <th>Archivo</th>
+                            <th>Material / Espesor</th>
+                            <th>Cant.</th>
+                            <th>Subtotal</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="carritoItems"></tbody>
+                </table>
+                <div id="carritoTotal" class="carrito-total">Total: $0.00</div>
+                <!-- Aquí prepararemos el botón de pago más adelante -->
+                <button type="button" id="btnCheckout" class="btn-success" style="font-size: 18px; padding: 15px; display: none;" onclick="iniciarCheckout()">Continuar al Pago</button>
+            </div>
         </div>
     </div>
 
@@ -75,13 +111,16 @@
         const uploadForm = document.getElementById('uploadForm');
         const resultadoBox = document.getElementById('resultadoBox');
         const infoTexto = document.getElementById('infoTexto');
-        const precioTexto = document.getElementById('precioTexto');
+        const precioUnitarioTexto = document.getElementById('precioUnitarioTexto');
         const canvas = document.getElementById('dxfCanvas');
         const ctx = canvas.getContext('2d');
 
+        let ultimaData = null; 
+        let carrito = [];      
+
         fileInput.addEventListener('change', () => {
             if (fileInput.files.length > 0) {
-                fileNameSpan.textContent = `Archivo seleccionado: ${fileInput.files[0].name}`;
+                fileNameSpan.textContent = `Archivo: ${fileInput.files[0].name}`;
             }
         });
 
@@ -92,7 +131,7 @@
 
             if (!b || b.width === 0 || b.height === 0) return;
 
-            const padding = 40;
+            const padding = 30;
             const drawWidth = canvas.width - (padding * 2);
             const drawHeight = canvas.height - (padding * 2);
 
@@ -109,35 +148,21 @@
             ctx.lineWidth = 1.5 / scale;
 
             geom.lineas.forEach(l => {
-                ctx.beginPath();
-                ctx.moveTo(l.x1, l.y1);
-                ctx.lineTo(l.x2, l.y2);
-                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke();
             });
-
             geom.circulos.forEach(c => {
-                ctx.beginPath();
-                ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI);
-                ctx.stroke();
+                ctx.beginPath(); ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI); ctx.stroke();
             });
-
             geom.arcos.forEach(a => {
-                ctx.beginPath();
-                ctx.arc(a.cx, a.cy, a.r, a.start, a.end);
-                ctx.stroke();
+                ctx.beginPath(); ctx.arc(a.cx, a.cy, a.r, a.start, a.end); ctx.stroke();
             });
-
             geom.polilineas.forEach(pts => {
                 if (pts.length > 1) {
-                    ctx.beginPath();
-                    ctx.moveTo(pts[0][0], pts[0][1]);
-                    for (let i = 1; i < pts.length; i++) {
-                        ctx.lineTo(pts[i][0], pts[i][1]);
-                    }
+                    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+                    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
                     ctx.stroke();
                 }
             });
-
             ctx.restore();
         }
 
@@ -154,8 +179,8 @@
             formData.append('espesor', document.getElementById('espesor').value);
             formData.append('cantidad', document.getElementById('cantidad').value);
 
-            infoTexto.textContent = 'Analizando pieza y calculando costos...';
-            precioTexto.textContent = '';
+            infoTexto.textContent = 'Analizando pieza...';
+            precioUnitarioTexto.textContent = '';
             resultadoBox.style.display = 'block';
 
             try {
@@ -163,23 +188,84 @@
                 const data = await response.json();
 
                 if (data.estado === 'exito') {
+                    ultimaData = data;
+                    ultimaData.nombre_archivo = fileInput.files[0].name;
+
                     infoTexto.innerHTML = `
                         <b>Dimensiones:</b> ${data.dimensiones} | 
                         <b>Perímetro:</b> ${data.perimetro_total_mm} mm<br>
                         <b>Material:</b> ${data.material} (${data.espesor} mm) | 
                         <b>Cantidad:</b> ${data.cantidad} u.
                     `;
-                    precioTexto.innerHTML = `Precio Total: $${data.precio_total.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
+                    precioUnitarioTexto.innerHTML = `Subtotal de este grupo: $${data.precio_total.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
                     
                     dibujarPieza(data);
                 } else {
                     infoTexto.textContent = `Error: ${data.mensaje}`;
-                    precioTexto.textContent = '';
+                    precioUnitarioTexto.textContent = '';
                 }
             } catch (error) {
                 infoTexto.textContent = 'Ocurrió un error al procesar la solicitud.';
             }
         });
+
+        function agregarAlCarrito() {
+            if (!ultimaData) return;
+
+            carrito.push(ultimaData);
+            actualizarTablaCarrito();
+
+            resultadoBox.style.display = 'none';
+            fileInput.value = '';
+            fileNameSpan.textContent = '';
+            ultimaData = null;
+        }
+
+        function eliminarDelCarrito(index) {
+            carrito.splice(index, 1);
+            actualizarTablaCarrito();
+        }
+
+        function actualizarTablaCarrito() {
+            const carritoVacio = document.getElementById('carritoVacio');
+            const carritoContenido = document.getElementById('carritoContenido');
+            const carritoItems = document.getElementById('carritoItems');
+            const carritoTotal = document.getElementById('carritoTotal');
+            const btnCheckout = document.getElementById('btnCheckout');
+
+            if (carrito.length === 0) {
+                carritoVacio.style.display = 'block';
+                carritoContenido.style.display = 'none';
+                return;
+            }
+
+            carritoVacio.style.display = 'none';
+            carritoContenido.style.display = 'block';
+            carritoItems.innerHTML = '';
+
+            let totalGeneral = 0;
+
+            carrito.forEach((item, index) => {
+                totalGeneral += item.precio_total;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.nombre_archivo} (${item.dimensiones})</td>
+                    <td>${item.material} - ${item.espesor}mm</td>
+                    <td>${item.cantidad} u.</td>
+                    <td>$${item.precio_total.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                    <td><button type="button" class="btn-danger" onclick="eliminarDelCarrito(${index})">X</button></td>
+                `;
+                carritoItems.appendChild(tr);
+            });
+
+            carritoTotal.textContent = `Total General: $${totalGeneral.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
+            // Mostramos el botón de checkout cuando hay elementos
+            btnCheckout.style.display = 'block';
+        }
+
+        function iniciarCheckout() {
+            alert('¡Próximo paso! Aquí conectaremos Mercado Pago para procesar el pago del carrito.');
+        }
     </script>
 </body>
 </html>
