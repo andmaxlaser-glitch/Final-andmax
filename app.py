@@ -1,6 +1,5 @@
 import os
 import gc
-import threading
 import mercadopago
 import resend
 from flask import Flask, render_template, request, jsonify
@@ -29,8 +28,8 @@ def index():
     if status == 'approved' and preference_id and preference_id in ordenes_pendientes:
         datos_compra = ordenes_pendientes.pop(preference_id)
         
-        hilo_correo = threading.Thread(target=enviar_correo_nuevo_pedido, args=(app, datos_compra))
-        hilo_correo.start()
+        # Envío directo del correo (espera a que termine antes de mostrar la página)
+        enviar_correo_nuevo_pedido(app, datos_compra)
         
         return render_template('index.html', pago_exitoso=True)
         
