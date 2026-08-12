@@ -293,3 +293,11 @@
     </script>
 </body>
 </html>
+// Mostrar alerta si el pago fue aprobado al volver de Mercado Pago
+    window.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('status') === 'approved') {
+            alert('¡Pago realizado con éxito! Tu pedido ha sido enviado al taller y nos pondremos manos a la obra.');
+            window.history.replaceState({}, document.title, window.location.pathname); // Limpia la URL
+        }
+    });
