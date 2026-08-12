@@ -2,7 +2,7 @@ import ezdxf
 import math
 
 def calcular_precio_pro(perimetro_mm, ancho_mm, alto_mm, material, espesor):
-    # Tabla de referencia de precios por metro / unidad de costo
+    # Tabla de precios por METRO de corte
     precios = {
         "MDF": {1: 600, 2: 700, 3: 800, 5: 900, 8: 1000, 10: 1200},
         "Acrilico": {1: 800, 2: 900, 3: 1000, 4: 1100, 5: 1200, 6: 1400, 8: 1600, 10: 1800},
@@ -15,17 +15,26 @@ def calcular_precio_pro(perimetro_mm, ancho_mm, alto_mm, material, espesor):
         esp_int = int(espesor)
         tarifa_base = precios.get(material, {}).get(esp_int, 0)
         
-        # 1. Costo por corte basado en metros de perímetro
+        # 1. Metros de corte (asegurando un mínimo de 0.5 metros cobrables para piezas chicas)
         metros_corte = perimetro_mm / 1000
+        if metros_corte < 0.5:
+            metros_corte = 0.5  # Mínimo de corte comercial
+            
         costo_corte = metros_corte * tarifa_base
         
-        # 2. Costo por material basado en el área de la pieza (convertido a metros cuadrados)
-        # Suponemos que el costo del material por m2 guarda relación con la tarifa base de corte
+        # 2. Costo por material basado en el área (m2)
         area_m2 = (ancho_mm / 1000) * (alto_mm / 1000)
-        costo_material = area_m2 * (tarifa_base * 0.5)  # Ajusta este multiplicador si el material es más caro/barato
+        costo_material = area_m2 * (tarifa_base * 0.4) 
         
-        # Precio Total = Material + Corte
         precio_total = costo_corte + costo_material
+        
+        # 3. Establecer un precio mínimo absoluto por pieza según el material
+        # (Por ejemplo, chapas o metales pesados tienen un arranque mayor)
+        precio_minimo = 2000 if "Acero" in material or material == "Aluminio" else 800
+        
+        if precio_total < precio_minimo:
+            precio_total = precio_minimo
+            
         return round(precio_total, 2)
     except:
         return 0.0
@@ -72,7 +81,6 @@ def analizar_dxf(ruta_archivo, material="MDF", espesor=1):
             for p in pl.get_points():
                 actualizar_limites(p[0], p[1])
 
-        # Ancho y alto total de la pieza en mm
         ancho_mm = max_x - min_x if max_x > min_x else 100
         alto_mm = max_y - min_y if max_y > min_y else 100
 
