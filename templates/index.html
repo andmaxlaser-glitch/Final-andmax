@@ -15,17 +15,15 @@
         button { background: #007bff; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 15px; }
         button:hover { background: #0056b3; }
         .resultado-box { margin-top: 20px; background: #e9ecef; padding: 20px; border-radius: 5px; display: none; font-size: 16px; }
-        .precio { font-size: 22px; color: #28a745; font-weight: bold; margin-top: 10px; }
-        
-        /* Estilos del Visor SVG */
-        .visor-container { margin-top: 20px; border: 1px solid #ddd; background: #fff; padding: 10px; border-radius: 6px; text-align: center; }
-        #svgContainer svg { max-width: 100%; height: 300px; display: block; margin: 0 auto; background: #1e1e1e; border-radius: 4px; }
+        .precio { font-size: 24px; color: #28a745; font-weight: bold; margin-top: 15px; }
+        .canvas-container { margin-top: 20px; text-align: center; background: #1e1e1e; border-radius: 6px; padding: 15px; }
+        canvas { max-width: 100%; height: auto; background: #1e1e1e; display: block; margin: 0 auto; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Cotizador de Corte Láser</h1>
-        <p style="text-align: center;">Sube tu archivo DXF, elige el material y previsualiza tu pieza al instante.</p>
+        <p style="text-align: center;">Sube tu archivo DXF, visualiza tu pieza y obtén tu presupuesto al instante.</p>
         
         <form id="uploadForm">
             <div class="upload-box" onclick="document.getElementById('fileInput').click()">
@@ -57,12 +55,13 @@
         <div id="resultadoBox" class="resultado-box">
             <h3>Resultado del Análisis:</h3>
             <p id="infoTexto"></p>
-            <div id="precioTexto" class="precio"></div>
             
-            <div class="visor-container">
-                <h4>Previsualización de la pieza:</h4>
-                <div id="svgContainer"></div>
+            <div class="canvas-container">
+                <h4 style="color: white; margin-top: 0;">Vista Previa de la Pieza</h4>
+                <canvas id="dxfCanvas" width="500" height="350"></canvas>
             </div>
+
+            <div id="precioTexto" class="precio"></div>
         </div>
     </div>
 
@@ -73,13 +72,77 @@
         const resultadoBox = document.getElementById('resultadoBox');
         const infoTexto = document.getElementById('infoTexto');
         const precioTexto = document.getElementById('precioTexto');
-        const svgContainer = document.getElementById('svgContainer');
+        const canvas = document.getElementById('dxfCanvas');
+        const ctx = canvas.getContext('2d');
 
         fileInput.addEventListener('change', () => {
             if (fileInput.files.length > 0) {
                 fileNameSpan.textContent = `Archivo seleccionado: ${fileInput.files[0].name}`;
             }
         });
+
+        function dibujarPieza(data) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const geom = data.geometrias;
+            const b = data.bounds;
+
+            if (!b || b.width === 0 || b.height === 0) return;
+
+            // Margen de padding en el canvas (en píxeles)
+            const padding = 40;
+            const drawWidth = canvas.width - (padding * 2);
+            const drawHeight = canvas.height - (padding * 2);
+
+            // Escala para ajustar la pieza al tamaño del canvas manteniendo proporciones
+            const scaleX = drawWidth / b.width;
+            const scaleY = drawHeight / b.height;
+            const scale = Math.min(scaleX, scaleY);
+
+            ctx.save();
+            // Centrar y voltear el eje Y (DXF usa coordenadas cartesianas hacia arriba, el canvas hacia abajo)
+            ctx.translate(padding, canvas.height - padding);
+            ctx.scale(scale, -scale);
+            ctx.translate(-b.min_x, -b.min_y);
+
+            ctx.strokeStyle = '#00ffcc'; // Color láser brillante
+            ctx.lineWidth = 1.5 / scale; // Mantener grosor de línea visible
+
+            // Dibujar líneas
+            geom.lineas.forEach(l => {
+                ctx.beginPath();
+                ctx.moveTo(l.x1, l.y1);
+                ctx.lineTo(l.x2, l.y2);
+                ctx.stroke();
+            });
+
+            // Dibujar círculos
+            geom.circulos.forEach(c => {
+                ctx.beginPath();
+                ctx.arc(c.cx, c.cy, c.r, 0, 2 * Math.PI);
+                ctx.stroke();
+            });
+
+            // Dibujar arcos
+            geom.arcos.forEach(a => {
+                ctx.beginPath();
+                ctx.arc(a.cx, a.cy, a.r, a.start, a.end);
+                ctx.stroke();
+            });
+
+            // Dibujar polilineas
+            geom.polilineas.forEach(pts => {
+                if (pts.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(pts[0][0], pts[0][1]);
+                    for (let i = 1; i < pts.length; i++) {
+                        ctx.lineTo(pts[i][0], pts[i][1]);
+                    }
+                    ctx.stroke();
+                }
+            });
+
+            ctx.restore();
+        }
 
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -93,9 +156,8 @@
             formData.append('material', document.getElementById('material').value);
             formData.append('espesor', document.getElementById('espesor').value);
 
-            infoTexto.textContent = 'Analizando pieza, generando gráfico y calculando costos...';
+            infoTexto.textContent = 'Analizando pieza y generando gráfico...';
             precioTexto.textContent = '';
-            svgContainer.innerHTML = '';
             resultadoBox.style.display = 'block';
 
             try {
@@ -110,11 +172,8 @@
                     `;
                     precioTexto.innerHTML = `Precio Estimado: $${data.precio_total.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
                     
-                    if (data.svg_data) {
-                        svgContainer.innerHTML = data.svg_data;
-                    } else {
-                        svgContainer.innerHTML = '<p style="color: gray;">No se pudo generar la vista previa.</p>';
-                    }
+                    // Ejecutar el visor en el canvas
+                    dibujarPieza(data);
                 } else {
                     infoTexto.textContent = `Error: ${data.mensaje}`;
                     precioTexto.textContent = '';
